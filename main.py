@@ -1,90 +1,199 @@
-import logging
-import time
-from telegram import ReplyKeyboardMarkup
-from telegram import ForceReply, Update
-from telegram import ReplyKeyboardRemove
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-import requests
+import sqlite3
+import telebot
+from telebot import types
+import config
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
+bot = telebot.TeleBot("6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ")
 
-logger = logging.getLogger(__name__)
-
-URL = 't.me/physics_training_bot'
-TOKEN = '6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ'
-
-
-async def start(update, context):
-    reply_keyboard = [['/start', '/help'],
-                      ['/data', '/time']]
-    markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False)
-    await update.message.reply_text(
-        "Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи?",
-        reply_markup=markup
-    )
+conn = sqlite3.connect('tasks.sqlite', check_same_thread=False)
+cursor = conn.cursor()
+chapters_str = ''
+sub_chapters_str = ''
+level_str = ''
+tasks_str = ''
+chapter_id = ''
+sub_chapter_id = ''
+level_id = ''
+task_id = ''
 
 
-async def close_keyboard(update, context):
-    await update.message.reply_text(
-        "Ok",
-        reply_markup=ReplyKeyboardRemove()
-    )
+def db_table_val(user_id: int, user_name: str, user_surname: str, username: str):
+    cursor.execute('INSERT INTO test (user_id, user_name, user_surname, username) VALUES (?, ?, ?, ?)',
+                   (user_id, user_name, user_surname, username))
+    conn.commit()
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Как я могу помочь?")
+def db_chapters():
+    global chapters_str
+    chapters_str = ''
+    result = cursor.execute('SELECT name FROM Chapters')
+    for elem in result:
+        chapters_str += str(elem)[2:len(str(elem)) - 3] + ', '
+    conn.commit()
+    return chapters_str
 
 
-async def topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "Для того, чтобы выбрать раздел напиши его номер:\n1.Кинематика \n2.Динамика\n3.Статика")
-    """
-    if a == '1':
-        await update.message.reply_text(
-            f'Для того, чтобы выбрать подраздел напиши его номер:\nAзбука кинематики\nПрямолинейное равномерное движение')
-    """
+def id_chapter(name_chapter: str):
+    result = cursor.execute('SELECT id FROM Chapters WHERE name = ?', (name_chapter,))
+    id_chapter = ''
+    for elem in result:
+        id_chapter += str(elem)[1:len(str(elem)) - 2]
+    return int(id_chapter)
 
 
-async def time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(time.asctime().split()[3])
+def db_sub_chapters(id_chapter: int):
+    global sub_chapters_str
+    sub_chapters_str = ''
+    result = cursor.execute(
+        'SELECT Subchapters.name FROM Subchapters INNER JOIN Chapters_Subchapters ON Subchapters.id = Chapters_Subchapters.id_Subchapters WHERE Chapters_Subchapters.id_Chapter = ?',
+        (id_chapter,))
+    for elem in result:
+        sub_chapters_str += str(elem)[2:len(str(elem)) - 3] + ', '
+    conn.commit()
+    return sub_chapters_str
 
 
-async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(' '.join(time.asctime().split()[1:3]))
+def id_sub_chapter(name_sub_chapter: str):
+    result = cursor.execute('SELECT id FROM Subchapters WHERE name = ?', (name_sub_chapter,))
+    id_sub_chapter = ''
+    for elem in result:
+        id_sub_chapter += str(elem)[1:len(str(elem)) - 2]
+    return int(id_sub_chapter)
 
 
-async def echo(update, context):
-    #global a
-    # У объекта класса Updater есть поле message,
-    # являющееся объектом сообщения.
-    # У message есть поле text, содержащее текст полученного сообщения,
-    # а также метод reply_text(str),
-    # отсылающий ответ пользователю, от которого получено сообщение.
-    a = update.message.reply_text(f'{update.message.text}')
-    await a
-    #await update.message.reply_text(f'{update.message.text}')
+def db_levels():
+    global level_str
+    level_str = ''
+    result = cursor.execute('SELECT name FROM levels')
+    for elem in result:
+        level_str += str(elem)[2:len(str(elem)) - 3] + ', '
+    conn.commit()
+    return level_str
 
 
-def main() -> None:
-    # Create the Application and pass it your bot's token.
-    application = Application.builder().token("6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ").build()
-    application.add_handler(CommandHandler("close", close_keyboard))
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("topic", topic))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("time", time_command))
-    application.add_handler(CommandHandler("data", data_command))
-
-    # Run the bot until the user presses Ctrl-C
-    text_handler = MessageHandler(filters.TEXT, echo)
-    application.add_handler(text_handler)
-    application.run_polling()
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+def id_level(name_level: str):
+    result = cursor.execute('SELECT id FROM levels WHERE name = ?', (name_level,))
+    id_level = ''
+    for elem in result:
+        id_level += str(elem)[1:len(str(elem)) - 2]
+    return int(id_level)
 
 
-if __name__ == "__main__":
-    main()
+def db_tasks():
+    global tasks_str
+    tasks_str = ''
+    result = cursor.execute(
+        'SELECT tasks.number FROM tasks INNER JOIN result ON tasks.id = result.id WHERE result.Chapter = ? and result.Subchapter = ? and result.Level = ?',
+        (chapter_id, sub_chapter_id, level_id))
+    for elem in result:
+        tasks_str += str(elem)[2:len(str(elem)) - 3] + ', '
+    return tasks_str
+
+
+def id_task(task_number):
+    tasks_id = ''
+    result = cursor.execute(
+        'SELECT tasks.id FROM tasks INNER JOIN result ON tasks.id = result.id WHERE result.Chapter = ? and result.Subchapter = ? and result.Level = ? and tasks.number = ?',
+        (chapter_id, sub_chapter_id, level_id, task_number))
+    for elem in result:
+        tasks_id += str(elem)[1:len(str(elem)) - 2]
+    return tasks_id
+
+
+def get_task_text(task_id):
+    task_text = ''
+    result = cursor.execute('SELECT name FROM tasks WHERE id = ?', (task_id,))
+    for elem in result:
+        task_text += str(elem)[2:len(str(elem)) - 3]
+    return task_text
+
+
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    db_chapters()
+    db_levels()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn1 = types.KeyboardButton("Нужна помощь🤔")
+    btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
+    markup.add(btn1, btn2)
+    bot.send_message(message.chat.id,
+                     'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи? \n \nЕсли ты еще не добавлен в систему, то напиши слово: "Привет"',
+                     reply_markup=markup)
+
+
+@bot.message_handler(content_types=['text'])
+def func(message):
+    global chapter_id, sub_chapter_id, level_id
+    if (message.text == "Нужна помощь🤔"):
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
+        bot.send_message(message.chat.id, text="Как я могу помочь?", reply_markup=markup)
+
+    elif (message.text == "Выбор раздела задачи🔎"):
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for elem in chapters_str.split(', '):
+            btn = types.KeyboardButton(elem)
+            markup.add(btn)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
+        bot.send_message(message.chat.id, text="Выбери раздел:", reply_markup=markup)
+
+    elif (message.text in chapters_str):
+        chapter_id = id_chapter(str(message.text))
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for elem in db_sub_chapters(id_chapter(str(message.text))).split(', '):
+            btn = types.KeyboardButton(elem)
+            markup.add(btn)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
+        bot.send_message(message.chat.id, text="Выбери подраздел:", reply_markup=markup)
+
+    elif (message.text in sub_chapters_str):
+        sub_chapter_id = id_sub_chapter(str(message.text))
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for elem in level_str.split(', '):
+            btn = types.KeyboardButton(elem)
+            markup.add(btn)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
+        bot.send_message(message.chat.id, text="Выбери уровень:", reply_markup=markup)
+
+    elif (message.text in level_str):
+        level_id = id_level(message.text)
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for elem in db_tasks().split(', '):
+            btn = types.KeyboardButton(elem)
+            markup.add(btn)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
+        bot.send_message(message.chat.id, text="Выбери номер задачи:", reply_markup=markup)
+
+    elif (message.text in tasks_str):
+        task_number = message.text
+        bot.send_message(message.chat.id, text=get_task_text(id_task(task_number)))
+
+    elif (message.text == 'На главную🏡'):
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Нужна помощь🤔")
+        btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
+        markup.add(btn1, btn2)
+        bot.send_message(message.chat.id,
+                         'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи? \n \nЕсли ты еще не добавлен в систему, то напиши слово: "Привет"',
+                         reply_markup=markup)
+
+
+@bot.message_handler(content_types=['text'])
+def get_text_messages(message):
+    if message.text.lower() == 'привет':
+        bot.send_message(message.chat.id, 'Ты успешно авторизовался!')
+
+        us_id = message.from_user.id
+        us_name = message.from_user.first_name
+        us_sname = message.from_user.last_name
+        username = message.from_user.username
+
+        db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
+
+
+bot.polling(none_stop=True)
