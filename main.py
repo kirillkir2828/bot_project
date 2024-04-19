@@ -3,7 +3,7 @@ import telebot
 from telebot import types
 import config
 
-bot = telebot.TeleBot("6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ")
+bot = telebot.TeleBot("TOKEN")
 
 conn = sqlite3.connect('tasks.sqlite', check_same_thread=False)
 cursor = conn.cursor()
@@ -15,10 +15,11 @@ chapter_id = ''
 sub_chapter_id = ''
 level_id = ''
 task_id = ''
+answers_str = []
 
 
 def db_table_val(user_id: int, user_name: str, user_surname: str, username: str):
-    cursor.execute('INSERT INTO test (user_id, user_name, user_surname, username) VALUES (?, ?, ?, ?)',
+    cursor.execute('INSERT INTO users (user_id, user_name, user_surname, username) VALUES (?, ?, ?, ?)',
                    (user_id, user_name, user_surname, username))
     conn.commit()
 
@@ -91,13 +92,14 @@ def db_tasks():
 
 
 def id_task(task_number):
-    tasks_id = ''
+    global task_id
+    task_id = ''
     result = cursor.execute(
         'SELECT tasks.id FROM tasks INNER JOIN result ON tasks.id = result.id WHERE result.Chapter = ? and result.Subchapter = ? and result.Level = ? and tasks.number = ?',
         (chapter_id, sub_chapter_id, level_id, task_number))
     for elem in result:
-        tasks_id += str(elem)[1:len(str(elem)) - 2]
-    return tasks_id
+        task_id += str(elem)[1:len(str(elem)) - 2]
+    return task_id
 
 
 def get_task_text(task_id):
@@ -108,12 +110,30 @@ def get_task_text(task_id):
     return task_text
 
 
+def get_answers():
+    global answers_str
+    answers_str = []
+    result = cursor.execute('SELECT answer1, answer2, answer3, answer4 FROM tasks WHERE id = ?', (task_id,))
+    for elem in result:
+        for i in elem:
+            answers_str.append(i)
+    return answers_str
+
+
+def right_answer():
+    right_answer_str = ''
+    result = cursor.execute('SELECT right_answer FROM tasks WHERE id = ?', (task_id,))
+    for elem in result:
+        right_answer_str += str(elem)[1:len(str(elem)) - 2]
+    return str(right_answer_str)[1:len(right_answer_str) - 1]
+
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
     db_chapters()
     db_levels()
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = types.KeyboardButton("Нужна помощь🤔")
+    btn1 = types.KeyboardButton("Авторизоваться🔑")
     btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
     markup.add(btn1, btn2)
     bot.send_message(message.chat.id,
@@ -124,13 +144,15 @@ def start_message(message):
 @bot.message_handler(content_types=['text'])
 def func(message):
     global chapter_id, sub_chapter_id, level_id
-    if (message.text == "Нужна помощь🤔"):
+    '''
+    if (message.text == "Авторизоваться🔑"):
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         btn_home = types.KeyboardButton('На главную🏡')
         markup.add(btn_home)
         bot.send_message(message.chat.id, text="Как я могу помочь?", reply_markup=markup)
+    '''
 
-    elif (message.text == "Выбор раздела задачи🔎"):
+    if (message.text == "Выбор раздела задачи🔎"):
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         for elem in chapters_str.split(', '):
             btn = types.KeyboardButton(elem)
@@ -172,20 +194,43 @@ def func(message):
     elif (message.text in tasks_str):
         task_number = message.text
         bot.send_message(message.chat.id, text=get_task_text(id_task(task_number)))
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for elem in get_answers():
+            btn = types.KeyboardButton(elem)
+            markup.add(btn)
+        # btn_home = types.KeyboardButton('На главную🏡')
+        # markup.add(btn_home)
+        bot.send_message(message.chat.id, 'Выбери правильный ответ:', reply_markup=markup)
+
+    elif (message.text in answers_str):
+        if str(message.text) == str(right_answer()):
+            bot.send_message(message.chat.id, 'Верно!✅')
+        else:
+            bot.send_message(message.chat.id, 'Неверно❌')
 
     elif (message.text == 'На главную🏡'):
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Нужна помощь🤔")
+        btn1 = types.KeyboardButton("Авторизоваться🔑")
         btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
         markup.add(btn1, btn2)
         bot.send_message(message.chat.id,
                          'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи? \n \nЕсли ты еще не добавлен в систему, то напиши слово: "Привет"',
                          reply_markup=markup)
 
+    elif message.text == 'Авторизоваться🔑':
+        bot.send_message(message.chat.id, 'Ты успешно авторизовался!')
+
+        us_id = message.from_user.id
+        us_name = message.from_user.first_name
+        us_sname = message.from_user.last_name
+        username = message.from_user.username
+
+        db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
+
 
 @bot.message_handler(content_types=['text'])
 def get_text_messages(message):
-    if message.text.lower() == 'привет':
+    if message.text.lower() == 'Авторизоваться🔑':
         bot.send_message(message.chat.id, 'Ты успешно авторизовался!')
 
         us_id = message.from_user.id
