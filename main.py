@@ -127,6 +127,13 @@ def right_answer():
         right_answer_str += str(elem)[1:len(str(elem)) - 2]
     return str(right_answer_str)[1:len(right_answer_str) - 1]
 
+def user():
+    users = ''
+    result = cursor.execute('SELECT username FROM users')
+    for elem in result:
+        users += str(elem)[2:len(str(elem)) - 3]
+    return users
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -137,7 +144,7 @@ def start_message(message):
     btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
     markup.add(btn1, btn2)
     bot.send_message(message.chat.id,
-                     'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи? \n \nЕсли ты еще не добавлен в систему, то напиши слово: "Привет"',
+                     'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи?',
                      reply_markup=markup)
 
 
@@ -198,8 +205,8 @@ def func(message):
         for elem in get_answers():
             btn = types.KeyboardButton(elem)
             markup.add(btn)
-        # btn_home = types.KeyboardButton('На главную🏡')
-        # markup.add(btn_home)
+        btn_home = types.KeyboardButton('На главную🏡')
+        markup.add(btn_home)
         bot.send_message(message.chat.id, 'Выбери правильный ответ:', reply_markup=markup)
 
     elif (message.text in answers_str):
@@ -214,31 +221,22 @@ def func(message):
         btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
         markup.add(btn1, btn2)
         bot.send_message(message.chat.id,
-                         'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи? \n \nЕсли ты еще не добавлен в систему, то напиши слово: "Привет"',
+                         'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи?',
                          reply_markup=markup)
 
     elif message.text == 'Авторизоваться🔑':
-        bot.send_message(message.chat.id, 'Ты успешно авторизовался!')
+        if str(message.from_user.username) not in user():
+            bot.send_message(message.chat.id, 'Ты успешно авторизовался!🎉')
 
-        us_id = message.from_user.id
-        us_name = message.from_user.first_name
-        us_sname = message.from_user.last_name
-        username = message.from_user.username
+            us_id = message.from_user.id
+            us_name = message.from_user.first_name
+            us_sname = message.from_user.last_name
+            username = message.from_user.username
 
-        db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
+            db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
+        else:
+            bot.send_message(message.chat.id, 'Ты уже авторизовался!')
 
-
-@bot.message_handler(content_types=['text'])
-def get_text_messages(message):
-    if message.text.lower() == 'Авторизоваться🔑':
-        bot.send_message(message.chat.id, 'Ты успешно авторизовался!')
-
-        us_id = message.from_user.id
-        us_name = message.from_user.first_name
-        us_sname = message.from_user.last_name
-        username = message.from_user.username
-
-        db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
 
 
 bot.polling(none_stop=True)
