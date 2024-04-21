@@ -3,7 +3,7 @@ import telebot
 from telebot import types
 import config
 
-bot = telebot.TeleBot("TOKEN")
+bot = telebot.TeleBot("6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ")
 
 conn = sqlite3.connect('tasks.sqlite', check_same_thread=False)
 cursor = conn.cursor()
@@ -127,12 +127,71 @@ def right_answer():
         right_answer_str += str(elem)[1:len(str(elem)) - 2]
     return str(right_answer_str)[1:len(right_answer_str) - 1]
 
+
 def user():
     users = ''
     result = cursor.execute('SELECT username FROM users')
     for elem in result:
         users += str(elem)[2:len(str(elem)) - 3]
     return users
+
+
+def get_image():
+    image_str = ''
+    result = cursor.execute('SELECT image FROM tasks WHERE id = ?', (task_id,))
+    for elem in result:
+        image_str = str(elem)[1:len(str(elem)) - 2]
+    image_str = image_str[1: len(image_str) - 1]
+    return image_str
+
+
+def insert_estimation(success, user):
+    attempt = 1
+    result = cursor.execute('SELECT estimation FROM Estimations WHERE user = ? and task = ?', (user, task_id))
+    for elem in result:
+        attempt += 1
+    estimation = 0
+    if success:
+        if level_id == 1:
+            if attempt == 1:
+                estimation = 3
+            elif attempt == 2:
+                estimation = 1
+            else:
+                estimation = 0
+        elif level_id == 2:
+            if attempt == 1:
+                estimation = 5
+            elif attempt == 2:
+                estimation = 3
+            elif attempt == 3:
+                estimation = 1
+            else:
+                estimation = 0
+        elif level_id == 3:
+            if attempt == 1:
+                estimation = 7
+            elif attempt == 2:
+                estimation = 5
+            elif attempt == 3:
+                estimation = 3
+            else:
+                estimation = 0
+        elif level_id == 4:
+            if attempt == 1:
+                estimation = 10
+            elif attempt == 2:
+                estimation = 7
+            elif attempt == 3:
+                estimation = 5
+            else:
+                estimation = 0
+    else:
+        estimation = 0
+    cursor.execute(
+        'INSERT INTO Estimations (user, chapter, subchapter, level, task, estimation) VALUES (?, ?, ?, ?, ?, ?)',
+        (user, chapter_id, sub_chapter_id, level_id, task_id, estimation))
+    conn.commit()
 
 
 @bot.message_handler(commands=['start'])
@@ -160,6 +219,8 @@ def func(message):
     '''
 
     if (message.text == "Выбор раздела задачи🔎"):
+        db_chapters()
+        db_levels()
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         for elem in chapters_str.split(', '):
             btn = types.KeyboardButton(elem)
@@ -207,15 +268,21 @@ def func(message):
             markup.add(btn)
         btn_home = types.KeyboardButton('На главную🏡')
         markup.add(btn_home)
+        if get_image() != 'on':
+            bot.send_photo(message.chat.id, open(rf'images/{get_image()}', 'rb'))
         bot.send_message(message.chat.id, 'Выбери правильный ответ:', reply_markup=markup)
 
     elif (message.text in answers_str):
         if str(message.text) == str(right_answer()):
             bot.send_message(message.chat.id, 'Верно!✅')
+            insert_estimation(True, message.from_user.id)
         else:
             bot.send_message(message.chat.id, 'Неверно❌')
+            insert_estimation(False, message.from_user.id)
 
     elif (message.text == 'На главную🏡'):
+        db_chapters()
+        db_levels()
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         btn1 = types.KeyboardButton("Авторизоваться🔑")
         btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
@@ -236,7 +303,6 @@ def func(message):
             db_table_val(user_id=us_id, user_name=us_name, user_surname=us_sname, username=username)
         else:
             bot.send_message(message.chat.id, 'Ты уже авторизовался!')
-
 
 
 bot.polling(none_stop=True)
