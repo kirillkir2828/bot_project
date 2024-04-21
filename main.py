@@ -194,6 +194,22 @@ def insert_estimation(success, user):
     conn.commit()
 
 
+def get_attempt(user):
+    count = 0
+    result = cursor.execute('SELECT estimation FROM Estimations WHERE user = ?', (user,))
+    for elem in result:
+        count += 1
+    return count
+
+
+def get_scores(user):
+    scor = 0
+    result = cursor.execute('SELECT estimation FROM Estimations WHERE user = ?', (user,))
+    for elem in result:
+        scor += int(list(elem)[0])
+    return scor
+
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
     db_chapters()
@@ -201,7 +217,9 @@ def start_message(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("Авторизоваться🔑")
     btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
-    markup.add(btn1, btn2)
+    btn3 = types.KeyboardButton("Статистика📊")
+    markup.add(btn2, btn3)
+    markup.add(btn1)
     bot.send_message(message.chat.id,
                      'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи?',
                      reply_markup=markup)
@@ -268,7 +286,7 @@ def func(message):
             markup.add(btn)
         btn_home = types.KeyboardButton('На главную🏡')
         markup.add(btn_home)
-        if get_image() != 'on':
+        if get_image() != 'on' and get_image() != '':
             bot.send_photo(message.chat.id, open(rf'images/{get_image()}', 'rb'))
         bot.send_message(message.chat.id, 'Выбери правильный ответ:', reply_markup=markup)
 
@@ -280,13 +298,18 @@ def func(message):
             bot.send_message(message.chat.id, 'Неверно❌')
             insert_estimation(False, message.from_user.id)
 
+    elif (message.text == 'Статистика📊'):
+        bot.send_message(message.chat.id,
+                         f'Твоя статистика📈:\n\nКоличетсво всех попыток при решении задач: {get_attempt(message.from_user.id)}🤩\n'
+                         f'Количетсво баллов: {get_scores(message.from_user.id)}💪')
+
     elif (message.text == 'На главную🏡'):
         db_chapters()
         db_levels()
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Авторизоваться🔑")
         btn2 = types.KeyboardButton("Выбор раздела задачи🔎")
-        markup.add(btn1, btn2)
+        btn3 = types.KeyboardButton("Статистика📊")
+        markup.add(btn2, btn3)
         bot.send_message(message.chat.id,
                          'Привет! 👋 \nЯ бот-тренажер по физике, давай вместе порешаем задачи?',
                          reply_markup=markup)
