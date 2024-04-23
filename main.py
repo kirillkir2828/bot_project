@@ -2,6 +2,7 @@ import sqlite3
 import telebot
 from telebot import types
 import config
+import gtts
 
 bot = telebot.TeleBot("6915498321:AAEG09W9StyUxgOqV7-wNw73RocE7I46msQ")
 
@@ -15,6 +16,7 @@ chapter_id = ''
 sub_chapter_id = ''
 level_id = ''
 task_id = ''
+task_number = ''
 answers_str = []
 
 
@@ -58,7 +60,7 @@ def id_sub_chapter(name_sub_chapter: str):
     result = cursor.execute('SELECT id FROM Subchapters WHERE name = ?', (name_sub_chapter,))
     id_sub_chapter = ''
     for elem in result:
-        id_sub_chapter += str(elem)[1:len(str(elem)) - 2]
+        id_sub_chapter = list(elem)[0]
     return int(id_sub_chapter)
 
 
@@ -278,14 +280,16 @@ def func(message):
         bot.send_message(message.chat.id, text="Выбери номер задачи:", reply_markup=markup)
 
     elif (message.text in tasks_str):
+        global task_number
         task_number = message.text
         bot.send_message(message.chat.id, text=get_task_text(id_task(task_number)))
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         for elem in get_answers():
             btn = types.KeyboardButton(elem)
             markup.add(btn)
+        btn_audio = types.KeyboardButton('Озвучить🎵')
         btn_home = types.KeyboardButton('На главную🏡')
-        markup.add(btn_home)
+        markup.add(btn_home, btn_audio)
         if get_image() != 'on' and get_image() != '':
             bot.send_photo(message.chat.id, open(rf'images/{get_image()}', 'rb'))
         bot.send_message(message.chat.id, 'Выбери правильный ответ:', reply_markup=markup)
@@ -297,6 +301,13 @@ def func(message):
         else:
             bot.send_message(message.chat.id, 'Неверно❌')
             insert_estimation(False, message.from_user.id)
+
+    elif (message.text == 'Озвучить🎵'):
+        t1 = gtts.gTTS(get_task_text(id_task(task_number)), lang='ru')
+        t1.save('Task.mp3')
+        audio = open(r'Task.mp3', 'rb')
+        bot.send_audio(message.chat.id, audio)
+        audio.close()
 
     elif (message.text == 'Статистика📊'):
         bot.send_message(message.chat.id,
